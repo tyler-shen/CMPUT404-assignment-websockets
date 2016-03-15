@@ -22,9 +22,13 @@
     "/>
     <script src="json2.js"></script>
   </head> 
-  <body bgcolor="white" height="100%" width="100%"> 
+  <body bgcolor="beige" height="100%" width="100%"> 
+      <center>
+      <h2>Welcome to Tyler's drawing board</h2>
+      <h3>Feel free to draw on the black area</h3>
+      </center>
     <div id="debug"></div>
-    <canvas id="c" width="100%" height="100%" style="-webkit-tap-highlight-color: transparent;"></canvas> 
+    <canvas id="c" width="100%" height="100%" style="-webkit-tap-highlight-color: transparent; cursor: url('brush.ico'),auto;"></canvas> 
 
     <script>
       // Fix me
@@ -64,7 +68,7 @@ function prepEntity(entity) {
         entity["colour"] = "#FF0000";
     }
     if (!entity["radius"]) {
-        entity["radius"] = 50;
+        entity["radius"] = 15;
     }
     return entity;
 }
@@ -125,6 +129,9 @@ function addEntity(entity, data) {
     world[entity] = data;
     drawNextFrame(); // (but should we?)
     //XXX: Send a XHTML Request that updates the entity you just modified!
+    msg = {};
+    msg[entity] = data;
+    socket.send(JSON.stringify(msg));
 }
 var counter = 0;
 function addEntityWithoutName(data) {
@@ -168,7 +175,7 @@ mouse = (function() {
                 var pos = getPosition(e);
                 var x = pos[0];
                 var y = pos[1];
-	        self.clicked = 1;
+                self.clicked = 1;
                 self.callListeners(self.mousedowners,x,y,self.clicked,e);
                 //addEntityWithoutName({'x':x,'y':y,'colour':'red'});
             }
@@ -180,8 +187,8 @@ mouse = (function() {
                 var pos = getPosition(e);
                 var x = pos[0];
                 var y = pos[1];
-	        //self.poppin(x,y);
-	        self.clicked = 0;
+                //self.poppin(x,y);
+                self.clicked = 0;
                 self.selected = -1;
                 self.callListeners(self.mouseuppers,x,y,self.clicked,e);
                 //addEntityWithoutName({'x':x,'y':y,'colour':'blue'});
@@ -191,11 +198,11 @@ mouse = (function() {
             self.lasttouch = e;                                         
             return self.mousedown(e);
         },
-	touchend: function(e) {
+        touchend: function(e) {
             var touch = (self.lasttouch)?self.lasttouch:e;
             return self.mouseup(touch);
-	},
-	mousemove: function(e) {
+        },
+        mousemove: function(e) {
             e.preventDefault();
             if (self.wasClicked(e)) {
                 var pos = getPosition(e);
@@ -203,7 +210,7 @@ mouse = (function() {
                 var y = pos[1];
 	        if (self.clicked != 0) {
 	            //self.squeakin(x,y);
-                    self.callListeners(self.mousedraggers,x,y,self.clicked,e);
+                self.callListeners(self.mousedraggers,x,y,self.clicked,e);
 	        }
                 self.callListeners(self.mousemovers,x,y,self.clicked,e);
             }            
@@ -239,8 +246,8 @@ mouse.mouseuppers.push(function(x,y,clicked,e) {
 });
 
 mouse.mousedraggers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'green',
-                          'radius':10});
+    addEntityWithoutName({'x':x,'y':y,'colour':('#'+(Math.random()*0xFFFFFF<<0).toString(16)),
+                          'radius':5});
 });
 
 
@@ -254,6 +261,22 @@ function wsSetup() {
     socket = new WebSocket(url);
     socket.onopen = function() {
         //XXX: TODO What are you going to do here?
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', 'http://' + host + '/world', flase);
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState == 4) {
+                try {
+                    if (xhr.status == 200) {
+                        var obj = JSON.parse(xhr.responseText);
+                        for (key in obj) {
+                            world[key] = obj[key]
+                        }
+                    }
+                } catch (e) {
+                }
+            }
+        };
+        xhr.send(null);
     };
     socket.onerror = function(msg) {
         debug("WebSocket Error:" + msg.data);
@@ -261,7 +284,12 @@ function wsSetup() {
     socket.onmessage = function(msg) {  
         try {
             debug("WebSocket Recv:" + msg.data);
-            //XXX: TODO What are you going to do here?            
+            //XXX: TODO What are you going to do here?
+            var message = JSON.parse(msg.data);
+            for (key in message) {
+                world[key] = message[key];
+            }
+            drawNextFrame();
         } catch (e) {
             alert("socket on message: " + e);
         }
